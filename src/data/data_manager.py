@@ -5,12 +5,13 @@ from .db_utils import (
     get_worker_by_name_from_db,
     update_worker_in_db,
     delete_worker_from_db,
+    init_db
 )
 
 class DataManager:
     """データのCRUD操作を管理するクラス。"""
     def __init__(self):
-        pass
+         pass #  init_db() を削除
 
     def add_worker(self, name, skill_levels):
         """ワーカーをデータベースに追加する。"""

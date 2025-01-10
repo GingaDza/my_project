@@ -12,6 +12,11 @@ print(sys.path)
 from PyQt6.QtWidgets import QApplication
 from src.main_window import MainWindow
 from src.data.data_manager import DataManager
+from src.data.db_utils import init_db
+
+global db_initialized # グローバルフラグを宣言
+db_initialized = False  # グローバルフラグを定義
+
 
 def load_test_data(data_manager):
     """テストデータをデータベースに追加する。"""
@@ -47,9 +52,15 @@ def load_test_data(data_manager):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     data_manager = DataManager()  # DataManager のインスタンスを作成 (データベース接続もここで行う)
+    project_root_path = os.path.dirname(os.path.abspath(__file__))  # プロジェクトルートの絶対パスを取得
+
+    if not db_initialized:  # データベースが初期化済みかどうかを確認
+       init_db()  # 初回起動時のみデータベースを初期化
+       db_initialized = True # グローバルフラグをTrueにする
 
     load_test_data(data_manager)  # テストデータの追加
 
-    main_win = MainWindow(data_manager)  # DataManager のインスタンスを渡す
+    main_win = MainWindow(data_manager, project_root_path)  # DataManager のインスタンスとプロジェクトルートを渡す
     main_win.show()
+
     sys.exit(app.exec())

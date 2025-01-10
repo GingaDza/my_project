@@ -13,7 +13,7 @@ class MplChartWidget(QWidget):
         self.setLayout(layout)
         self.ax = None
 
-    def plot_radar_chart(self, data, categories, title):
+    def plot_radar_chart(self, data, categories, title=""):
         """データを基にレーダーチャートを描画する。"""
         if self.ax is None:
             self.ax = self.figure.add_subplot(111, polar=True)
@@ -39,38 +39,16 @@ class MplChartWidget(QWidget):
         self.ax.set_yticks([1, 2, 3, 4, 5])
         self.ax.set_yticklabels(['1', '2', '3', '4', '5'])
 
-        self.ax.set_title(title)
+        #self.ax.set_title(title) # ここを削除
 
+        print(f"--- MplChartWidget: plot_radar_chart: angles: {angles}") # 追加
+        print(f"--- MplChartWidget: plot_radar_chart: data: {data}") # 追加
+        
         self.canvas.draw()
-
 
     def update_chart(self, data, categories):
-        """データを基にレーダーチャートを更新するメソッド"""
-        if self.ax is None:
-            self.ax = self.figure.add_subplot(111, polar=True)
-        else:
-            self.ax.clear()
-
-        num_vars = len(categories)
-        angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-        angles += angles[:1]
-
-        data += data[:1]
-
-        self.ax.plot(angles, data, linewidth=2, linestyle='solid')
-        self.ax.fill(angles, data, 'b', alpha=0.1)
-
-        self.ax.set_xticks(angles[:-1])
-        self.ax.set_xticklabels(categories)
-
-        self.ax.set_theta_offset(np.pi / 2)
-        self.ax.set_theta_direction(-1)
-
-        self.ax.set_ylim(0, 5)
-        self.ax.set_yticks([1, 2, 3, 4, 5])
-        self.ax.set_yticklabels(['1', '2', '3', '4', '5'])
-
-        self.canvas.draw()
+        """データを基にレーダーチャートを更新する。"""
+        self.plot_radar_chart(data, categories)
 
     def update_comparison_chart(self, data_list, categories, worker_names):
         """複数のワーカーのデータを基にレーダーチャートを更新する。"""
@@ -101,5 +79,5 @@ class MplChartWidget(QWidget):
 
         # 凡例
         self.ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
-
+        # self.ax.set_title("") # ここを削除
         self.canvas.draw()

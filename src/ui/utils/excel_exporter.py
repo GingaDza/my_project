@@ -1,50 +1,51 @@
+import pandas as pd
+from datetime import datetime
 import openpyxl
-from openpyxl.styles import PatternFill
+import openpyxl.drawing.image
+import os
+import logging
 
+logger = logging.getLogger(__name__)
 class ExcelExporter:
-    def export_to_excel(self, worker_data, output_path):
-        """ワーカーのスキルデータをExcelファイルに出力する。"""
-        print("--- ExcelExporter: export_to_excel ---")
-        print(f"  worker_data: {worker_data}")
+    def __init__(self):
+        # スクリプトのディレクトリを基準に output ディレクトリのパスを設定
+        self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'output')
+       
+    def export_to_excel(self, worker_data, filepath):
+        logger.debug(f"ExcelExporter.export_to_excel called ,filepath: {filepath}")
+        # 現在の日時を取得してフォルダ名に使用
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_folder = os.path.join(self.output_dir, f"SkillMatrix_App_data_{timestamp}")
+        
+        # output_folder が存在しない場合は作成
+        os.makedirs(output_folder, exist_ok=True)
 
-        all_categories = []
-        for worker_name, worker_obj in worker_data.items():
-            for category in worker_obj.categories:
-                if category not in all_categories:
-                    all_categories.append(category)
+        # データフレームの作成準備
+        all_categories = set()
+        for worker in worker_data.values():
+            all_categories.update(worker.categories)
+        all_categories = list(all_categories)
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Skill Matrix"
+        data = {}
+        for name, worker in worker_data.items():
+            data[name] = pd.Series(worker.skill_levels, index=worker.categories)
 
-        # ヘッダー行を作成
-        headers = ["名前"] + all_categories
-        ws.append(headers)
+        df = pd.DataFrame(data).fillna(0) #NaNを0で補完
+        df = df.reindex(all_categories)
 
-        # データ行を作成
-        for worker_name, worker_obj in worker_data.items():
-            row = [worker_name]
-            for category in all_categories:
-                if category in worker_obj.categories:
-                    index = worker_obj.categories.index(category)
-                    row.append(worker_obj.skill_levels[index])
-                else:
-                    row.append("")  # カテゴリーがない場合は空欄
-            ws.append(row)
+        # ファイル名に使用
+        if not filepath:
+            filename = os.path.join(output_folder, f"skill_data_{timestamp}.xlsx")
+        else:
+            filename = os.path.join(output_folder, filepath)
+        logger.debug(f"ExcelExporter.export_to_excel: full_filepath = {filename}")
 
-        # スタイルの設定（ここでは、スキルレベルに応じてセルの色を変更）
-        for row in ws.iter_rows(min_row=2):  # ヘッダー行を除外
-            for cell in row:
-                if isinstance(cell.value, int):
-                    if cell.value == 5:
-                        cell.fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")  # Green
-                    elif cell.value == 4:
-                        cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
-                    elif cell.value == 3:
-                        cell.fill = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")  # Orange
-                    elif cell.value == 2:
-                        cell.fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")  # Pink
-                    else:
-                        cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
-        print(f"Saving Excel file to: {output_path}")
-        wb.save(output_path)
+        # Excelファイルに出力
+        try:
+            df.to_excel(filename, index=True, header=True)
+            logger.debug(f"ExcelExporter.export_to_excel:Excel saved to {filename}")
+        except Exception as e:
+            logger.error(f"ExcelExporter.export_to_excel: Error saving Excel file: {e}")
+            return None
+
+        return filename

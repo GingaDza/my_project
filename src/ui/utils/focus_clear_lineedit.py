@@ -31,8 +31,7 @@ class FocusClearLineEdit(QLineEdit):
         if self.mainWindow.selected_worker is not None:
             print("--- FocusClearLineEdit: focusInEvent End (existing worker selected) ---\n")
             return
-
-        # 名前入力欄が空欄の場合、新規入力モードに移行
+       
         if self.text() == "":
              self.skip_on_text_changed = True
              self.mainWindow.selected_worker = None

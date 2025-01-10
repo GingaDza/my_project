@@ -111,9 +111,9 @@ class DataAnalysisTab(QWidget):
                 skill_levels = worker['skill_levels'][:len(all_categories)]
                 skill_levels += [1] * (len(all_categories) - len(skill_levels))
                 data_to_plot.append(skill_levels)
-
-        self.comparison_chart_widget.update_comparison_chart(data_to_plot, all_categories, selected_workers)
-
+        
+        if data_to_plot: # 追加
+           self.comparison_chart_widget.update_comparison_chart(data_to_plot, all_categories, selected_workers)
     def on_worker_selected(self, worker_name):
         """ワーカーが選択されたときの処理。"""
         self.selected_worker = worker_name

@@ -24,7 +24,7 @@ from .ui.data_analysis_tab import DataAnalysisTab
 
 class MainWindow(QMainWindow):
     """メインウィンドウのUIを管理するクラス。"""
-    def __init__(self, data_manager):
+    def __init__(self, data_manager, project_root):
         super().__init__()
         self.setWindowTitle("データベース整合性テストアプリ")
         self.setGeometry(100, 100, 1200, 900)  # 画面サイズを大きくする
@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         # データベースからカテゴリを取得し、スキルレベルの数を決める
         self.categories_from_db = self.get_categories_from_db()
         self.num_skill_levels = len(self.categories_from_db)
+        self.project_root = project_root # プロジェクトルートを保存
 
         self.setup_ui()
         self.load_workers()
@@ -46,7 +47,7 @@ class MainWindow(QMainWindow):
         self.unsaved_changes = False
         self.skip_skill_level_change = False # 追加
 
-         # PDF出力のためのインスタンスを作成
+        # PDF出力のためのインスタンスを作成
         self.pdf_exporter = PdfExporter() # 追加
 
         # アプリ起動時にチャートを初期値で描画
@@ -59,7 +60,7 @@ class MainWindow(QMainWindow):
         self.main_layout = QHBoxLayout(self.central_widget)
 
         self.setup_left_panel()
-        setup_right_panel() # この行を修正
+        self.setup_right_panel() # ここを修正
 
     def setup_left_panel(self):
         """左側のパネル（ワーカーリスト）のセットアップ。"""
@@ -91,7 +92,82 @@ class MainWindow(QMainWindow):
         self.delete_button.clicked.connect(self.delete_worker)
 
         self.export_data_button = QPushButton("データ出力")
-        self.export_data_button.clicked.connect(lambda: self.export_data(os.path.join(os.path.dirname(__file__), "..", "output"))) # 変更
+        self.export_data_button.clicked.connect(lambda: self.export_data(os.path.join(self.project_root, "output"))) # 変更
+    
+    def setup_right_panel(self):  # ここでselfを追加
+        """右側のパネル（ワーカー情報の編集）のセットアップ。"""
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+
+        # 名前入力欄
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(QLabel("名前:"))
+        self.name_input = FocusClearLineEdit(parent=self)
+        self.name_input.setPlaceholderText("名前を入力")
+        name_layout.addWidget(self.name_input)
+        right_layout.addLayout(name_layout)
+
+        # タブウィジェットの作成
+        self.tab_widget = QTabWidget()
+
+        # 親カテゴリごとのレイアウトを作成し、タブに追加
+        for parent_category, child_categories in self.categories.items():
+            tab_widget = QWidget()
+            tab_layout = QVBoxLayout(tab_widget)
+
+            # 各子カテゴリに対応するコンボボックスを追加
+            skill_combo_boxes = []
+            for child_category in child_categories:
+                child_layout = QHBoxLayout()
+                child_layout.addWidget(QLabel(child_category))
+                combo_box = QComboBox()
+                combo_box.addItems([str(i) for i in range(1, 6)])
+                combo_box.currentIndexChanged.connect(self.on_skill_level_changed)
+                child_layout.addWidget(combo_box)
+                skill_combo_boxes.append(combo_box) # コンボボックスをリストに追加
+                tab_layout.addLayout(child_layout)
+            # チャートウィジェットを追加
+            chart_widget = MplChartWidget()
+            tab_layout.addWidget(chart_widget)
+            self.tab_widget.addTab(tab_widget, parent_category)
+
+        # 総合評価タブ
+        from .ui.overall_tab import OverallTab
+        self.overall_tab = OverallTab(self.data_manager, self.get_categories_from_db())
+        self.tab_widget.addTab(self.overall_tab, "総合評価")
+        self.overall_tab.update_chart()
+
+
+        # データ管理・レポートタブ
+        from .ui.data_management_report_tab import DataManagementReportTab
+        self.data_management_report_tab = DataManagementReportTab(self.data_manager, self.categories)
+        self.tab_widget.addTab(self.data_management_report_tab, "データ管理・レポート")
+
+        # データ分析タブ
+        from .ui.data_analysis_tab import DataAnalysisTab
+        self.data_analysis_tab = DataAnalysisTab(self.data_manager, self.get_categories_from_db)
+        self.tab_widget.addTab(self.data_analysis_tab, "データ分析")
+
+        right_layout.addWidget(self.tab_widget)
+
+        # ボタン
+        button_layout = QHBoxLayout()
+        self.new_button = QPushButton("新規")
+        self.new_button.clicked.connect(self.new_worker)
+        button_layout.addWidget(self.new_button)
+
+        self.save_button = QPushButton("保存")
+        self.save_button.clicked.connect(self.save_worker)
+        button_layout.addWidget(self.save_button)
+
+        self.delete_button = QPushButton("削除")
+        self.delete_button.clicked.connect(self.delete_worker)
+        button_layout.addWidget(self.delete_button)
+
+        right_layout.addLayout(button_layout)
+        self.main_layout.addWidget(right_panel)
+
+
 
     def load_workers(self):
         """データベースからワーカーを読み込み、リストに表示する。"""
@@ -140,6 +216,13 @@ class MainWindow(QMainWindow):
 
             # 選択されたワーカーのスキルレベルでチャートを更新
             self.update_chart_with_selected_worker_skill_levels()
+
+            # 他のタブのチャートも更新
+            for tab_index in range(self.tab_widget.count()):
+              if self.tab_widget.tabText(tab_index) != "総合評価":
+                    self.update_chart_for_tab(tab_index)
+            # 総合評価タブのチャートを更新する
+            self.overall_tab.update_chart()
 
         self.unsaved_changes = False
         print("--- MainWindow: on_worker_selected End ---\n")
@@ -432,3 +515,48 @@ class MainWindow(QMainWindow):
         """指定されたタブインデックスに対応するカテゴリーリストを返す。"""
         parent_category = self.tab_widget.tabText(tab_index)
         return self.categories.get(parent_category, [])
+    
+    def export_data(self, output_dir):
+        """データ出力用のメニューを表示する。"""
+        # 確認メッセージを表示
+        reply = QMessageBox.question(self, "確認", "データを出力しますか？",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        # 変更: 戻り値を変更
+        if reply == QMessageBox.StandardButton.No:
+            return
+
+        # エクスポート用のワーカーデータを取得
+        worker_data = self.get_worker_data_for_export()
+        print(f"--- MainWindow: export_data: worker_data={worker_data}") # デバッグ
+
+        # 出力ディレクトリの準備
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = os.path.join(output_dir, f"SkillMatrix_App_data_{timestamp}")
+        os.makedirs(output_path, exist_ok=True)
+
+        # エクセル出力
+        excel_exporter = ExcelExporter()
+        excel_filepath = os.path.join(output_path, f"skill_data_{timestamp}.xlsx")
+        # 変更: Excel 出力時のデータを確認
+        print(f"--- MainWindow: export_data: Exporting to Excel - worker_data={worker_data}, excel_filepath={excel_filepath}")
+        excel_exporter.export_to_excel(worker_data, excel_filepath)
+        print(f"Excel file saved to: {excel_filepath}")
+
+        # PDF出力
+        pdf_filepath =  f"radar_charts_{timestamp}.pdf"
+        # 変更: PDF 出力時のデータを確認
+        print(f"--- MainWindow: export_data: Exporting to PDF - worker_data={worker_data}, pdf_filepath={pdf_filepath}")
+        full_pdf_path = self.pdf_exporter.export_to_pdf(worker_data, pdf_filepath, output_path) # 修正
+        print(f"PDF file saved to: {full_pdf_path}")
+
+        QMessageBox.information(self, "情報", f"データ出力が完了しました。\n出力先：{output_path}")
+        return True
+    
+    def get_worker_data_for_export(self):
+        """エクスポート用のワーカーデータを取得する。"""
+        all_workers = self.data_manager.get_all_workers()
+        worker_data = {}
+        for worker in all_workers:
+            worker_data[worker['name']] = WorkerData(worker['name'], self.categories_from_db, worker['skill_levels'])
+        print(f"--- MainWindow: get_worker_data_for_export: Exporting data - {worker_data}") # デバッグ
+        return worker_data
