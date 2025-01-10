@@ -1,3 +1,4 @@
+# src/ui/data_analysis_tab.py
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QListWidget, QStackedWidget, QListWidgetItem,
